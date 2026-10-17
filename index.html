@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Neon Blocks — Tetris</title>
+<style>
+:root{--bg:#090d18;--panel:#121a2b;--line:#27334d;--text:#edf4ff;--muted:#8fa0bd;--cyan:#55e7ff;--pink:#ff5fc8}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% 0%,#172744 0,#090d18 60%);font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);display:flex;justify-content:center;align-items:center;padding:16px}
+.app{width:min(100%,760px)}header{display:flex;justify-content:space-between;align-items:center;margin:0 0 14px;gap:12px}.brand{font-weight:900;letter-spacing:2px;font-size:clamp(20px,4vw,30px)}.brand span{color:var(--cyan)}.tag{color:var(--muted);font-size:11px;letter-spacing:2px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 155px;gap:12px;align-items:start}.board-wrap,.card{background:linear-gradient(145deg,#151e31,#0e1524);border:1px solid var(--line);border-radius:16px;box-shadow:0 14px 40px #0005}.board-wrap{padding:10px;position:relative}.board{display:block;width:100%;height:auto;border-radius:9px;background:#080d17;touch-action:none}
+.side{display:grid;gap:10px}.card{padding:12px}.label{font-size:10px;color:var(--muted);letter-spacing:1.5px;font-weight:800}.value{font-size:24px;font-weight:850;margin-top:4px}.mini{width:100%;height:95px;display:block;margin-top:5px}.levelrow{display:flex;justify-content:space-between;align-items:center}.progress{height:5px;border-radius:9px;background:#263149;margin-top:9px;overflow:hidden}.progress div{height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--pink));transition:width .2s}
+.actions{display:flex;gap:8px;margin-top:12px}.btn{border:1px solid #344360;background:#1a2740;color:var(--text);border-radius:10px;padding:10px 12px;font-weight:750;cursor:pointer}.btn.primary{background:linear-gradient(120deg,#13b9d5,#6c71ff);border:0;color:#07111d}.btn:active,.pad button:active{transform:scale(.96)}.hint{font-size:11px;color:var(--muted);line-height:1.6;margin-top:10px}.overlay{position:absolute;inset:10px;border-radius:9px;background:#080d17d9;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}.overlay.hidden{display:none}.overlay h2{margin:0 0 8px;font-size:26px}.overlay p{color:#b8c7e2;font-size:13px;line-height:1.5}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;touch-action:manipulation}.pad button{border:1px solid #344360;background:#17233a;color:white;border-radius:13px;min-height:48px;font-size:20px;font-weight:800;box-shadow:0 4px 0 #080d17;touch-action:manipulation}.pad .wide{font-size:12px;letter-spacing:.4px}.pad .blank{visibility:hidden}
+footer{text-align:center;color:#687b9c;font-size:10px;margin-top:12px}
+@media(max-width:480px){body{padding:10px;align-items:flex-start}.layout{grid-template-columns:minmax(0,1fr) 102px;gap:8px}.board-wrap{padding:6px}.card{padding:9px;border-radius:12px}.side{gap:7px}.value{font-size:19px}.mini{height:70px}.label{font-size:9px}.hint{font-size:10px}.btn{padding:9px 10px}.pad{gap:6px}.pad button{min-height:45px}}
+</style>
+</head>
+<body>
+<main class="app">
+<header><div><div class="brand">NEON<span>BLOCKS</span></div><div class="tag">ARCADE • CLASSIC MODE</div></div><div class="tag">HTML5 / OFFLINE</div></header>
+<div class="layout">
+<section class="board-wrap"><canvas id="board" class="board" width="300" height="600" aria-label="Tablero de Tetris"></canvas>
+<div id="overlay" class="overlay"><div><h2 id="ovtitle">¿Listo para jugar?</h2><p id="ovtext">Completa líneas, suma puntos y supera tu récord.</p><button class="btn primary" id="start">▶ JUGAR</button></div></div></section>
+<aside class="side">
+<div class="card"><div class="label">PUNTUACIÓN</div><div class="value" id="score">0</div></div>
+<div class="card"><div class="label">RÉCORD</div><div class="value" id="best">0</div></div>
+<div class="card"><div class="label">NIVEL</div><div class="levelrow"><div class="value" id="level">1</div><div class="label" id="lines">0 líneas</div></div><div class="progress"><div id="prog"></div></div></div>
+<div class="card"><div class="label">SIGUIENTE</div><canvas id="next" class="mini" width="120" height="90"></canvas></div>
+<div class="card"><div class="label">CONTROLES</div><div class="hint">← → Mover<br>↑ Girar<br>↓ Bajar<br>Espacio: caída<br>P: pausa</div></div>
+</aside></div>
+<div class="pad" aria-label="Controles táctiles">
+<button class="blank">•</button><button data-act="rotate">↻</button><button class="blank">•</button>
+<button data-act="left">←</button><button data-act="down">↓</button><button data-act="right">→</button>
+<button class="wide" data-act="drop">CAÍDA ⤓</button><button class="wide" data-act="pause">PAUSA</button><button class="wide" data-act="restart">REINICIAR</button>
+</div>
+<div class="actions"><button class="btn primary" id="newgame">Nuevo juego</button><button class="btn" id="pausebtn">Pausar</button></div>
+<footer>Hecho para jugar en escritorio y celular · No requiere conexión</footer>
+</main>
+<script>
+(()=>{
+const COLS=10,ROWS=20,board=document.getElementById('board'),ctx=board.getContext('2d'),ncan=document.getElementById('next'),nctx=ncan.getContext('2d');
+const colors={I:'#52e8ff',O:'#ffe66d',T:'#b68cff',S:'#6dffb2',Z:'#ff6f91',J:'#6b9bff',L:'#ffad66'};
+const shapes={I:[[1,1,1,1]],O:[[1,1],[1,1]],T:[[0,1,0],[1,1,1]],S:[[0,1,1],[1,1,0]],Z:[[1,1,0],[0,1,1]],J:[[1,0,0],[1,1,1]],L:[[0,0,1],[1,1,1]]};
+let grid,piece,next,score,lines,level,over,paused,running,last=0,dropCounter=0,raf=0,best=0;
+try{best=Number(localStorage.getItem('neonblocks-best'))||0}catch(e){}
+document.getElementById('best').textContent=best;
+function matrix(){return Array.from({length:ROWS},()=>Array(COLS).fill(0))}
+function pick(){let keys=Object.keys(shapes),k=keys[Math.floor(Math.random()*keys.length)];return {k,m:shapes[k].map(r=>r.slice()),x:Math.floor(COLS/2)-Math.ceil(shapes[k][0].length/2),y:0}}
+function init(){grid=matrix();score=0;lines=0;level=1;over=false;paused=false;running=true;piece=pick();next=pick();last=0;dropCounter=0;ui();hideOverlay();draw();cancelAnimationFrame(raf);raf=requestAnimationFrame(loop)}
+function ui(){document.getElementById('score').textContent=score;document.getElementById('level').textContent=level;document.getElementById('lines').textContent=lines+' líneas';document.getElementById('prog').style.width=(lines%10)*10+'%';document.getElementById('best').textContent=best;drawNext()}
+function drawCell(c,x,y,size,alpha=1){if(!c)return;ctx.globalAlpha=alpha;ctx.fillStyle=c;ctx.fillRect(x*size+1,y*size+1,size-2,size-2);ctx.fillStyle='#ffffff35';ctx.fillRect(x*size+3,y*size+3,size-6,Math.max(2,size*.12));ctx.strokeStyle='#ffffff2b';ctx.strokeRect(x*size+1.5,y*size+1.5,size-3,size-3);ctx.globalAlpha=1}
+function draw(){const w=board.width/COLS,h=board.height/ROWS;ctx.clearRect(0,0,board.width,board.height);ctx.fillStyle='#080d17';ctx.fillRect(0,0,board.width,board.height);ctx.strokeStyle='#ffffff09';for(let x=0;x<=COLS;x++){ctx.beginPath();ctx.moveTo(x*w,0);ctx.lineTo(x*w,board.height);ctx.stroke()}for(let y=0;y<=ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*h);ctx.lineTo(board.width,y*h);ctx.stroke()}
+grid.forEach((r,y)=>r.forEach((c,x)=>{if(c)drawCell(c,x,y,w)}));
+if(piece){let ghost={...piece,y:piece.y};while(valid(ghost,0,1))ghost.y++;piece.m.forEach((r,y)=>r.forEach((v,x)=>{if(v)drawCell(colors[piece.k],piece.x+x,ghost.y+y,w,.22)}));piece.m.forEach((r,y)=>r.forEach((v,x)=>{if(v)drawCell(colors[piece.k],piece.x+x,piece.y+y,w)}))}
+}
+function drawNext(){nctx.clearRect(0,0,ncan.width,ncan.height);if(!next)return;let m=next.m,s=18,ox=(ncan.width-m[0].length*s)/2,oy=(ncan.height-m.length*s)/2;nctx.fillStyle='#080d17';nctx.fillRect(0,0,ncan.width,ncan.height);m.forEach((r,y)=>r.forEach((v,x)=>{if(v){nctx.fillStyle=colors[next.k];nctx.fillRect(ox+x*s+1,oy+y*s+1,s-2,s-2);nctx.fillStyle='#ffffff35';nctx.fillRect(ox+x*s+3,oy+y*s+3,s-6,3)}}))}
+function valid(p,dx=0,dy=0,m=p.m){for(let y=0;y<m.length;y++)for(let x=0;x<m[y].length;x++)if(m[y][x]){let nx=p.x+x+dx,ny=p.y+y+dy;if(nx<0||nx>=COLS||ny>=ROWS)return false;if(ny>=0&&grid[ny][nx])return false}return true}
+function rotate(){let m=piece.m[0].map((_,i)=>piece.m.map(r=>r[i]).reverse());for(let dx of [0,-1,1,-2,2])if(valid(piece,dx,0,m)){piece.x+=dx;piece.m=m;draw();return}}
+function move(dx,dy){if(valid(piece,dx,dy)){piece.x+=dx;piece.y+=dy;draw();return true}return false}
+function lock(){piece.m.forEach((r,y)=>r.forEach((v,x)=>{if(v&&piece.y+y>=0)grid[piece.y+y][piece.x+x]=colors[piece.k]}));let cleared=0;for(let y=ROWS-1;y>=0;y--)if(grid[y].every(Boolean)){grid.splice(y,1);grid.unshift(Array(COLS).fill(0));cleared++;y++}
+if(cleared){score+=[0,100,300,500,800][cleared]*level;lines+=cleared;level=Math.floor(lines/10)+1}piece=next;next=pick();if(!valid(piece)){gameover();return}ui();draw()}
+function drop(){if(!running||paused||over)return;if(!move(0,1))lock();else score+=0;ui()}
+function hardDrop(){if(!running||paused||over)return;let d=0;while(move(0,1))d++;score+=d*2;lock();ui();draw()}
+function gameover(){over=true;running=false;draw();if(score>best){best=score;try{localStorage.setItem('neonblocks-best',best)}catch(e){}}ui();showOverlay('¡Fin de partida!','Puntuación: '+score+' · Pulsa para volver a intentarlo.','REINTENTAR')}
+function showOverlay(title,txt,button){document.getElementById('ovtitle').textContent=title;document.getElementById('ovtext').textContent=txt;document.getElementById('start').textContent='▶ '+button;document.getElementById('overlay').classList.remove('hidden')}
+function hideOverlay(){document.getElementById('overlay').classList.add('hidden')}
+function togglePause(){if(over)return;paused=!paused;if(paused)showOverlay('Pausa','Respira. Tu partida está en pausa.','CONTINUAR');else hideOverlay();document.getElementById('pausebtn').textContent=paused?'Continuar':'Pausar'}
+function loop(t){raf=requestAnimationFrame(loop);if(!running||paused||over)return;if(!last)last=t;let delta=t-last;last=t;dropCounter+=delta;let interval=Math.max(90,750-(level-1)*58);if(dropCounter>interval){if(!move(0,1))lock();dropCounter=0}draw()}
+document.addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','ArrowDown','ArrowUp',' '].includes(e.key))e.preventDefault();if(e.key==='p'||e.key==='P'){togglePause();return}if(!running||paused||over)return;switch(e.key){case'ArrowLeft':move(-1,0);break;case'ArrowRight':move(1,0);break;case'ArrowDown':if(move(0,1)){score++;ui()}else lock();break;case'ArrowUp':rotate();break;case' ':hardDrop();break}draw()});
+document.querySelectorAll('[data-act]').forEach(b=>{const act=()=>{let a=b.dataset.act;if(a==='pause')togglePause();else if(a==='restart')init();else if(!running||paused||over)return;else if(a==='left')move(-1,0);else if(a==='right')move(1,0);else if(a==='down'){if(move(0,1)){score++;ui()}else lock()}else if(a==='rotate')rotate();else if(a==='drop')hardDrop();draw()};b.addEventListener('click',act);if(b.dataset.act==='left'||b.dataset.act==='right'||b.dataset.act==='down'){let timer;b.addEventListener('touchstart',e=>{e.preventDefault();act();timer=setInterval(act,110)},{passive:false});['touchend','touchcancel'].forEach(ev=>b.addEventListener(ev,()=>clearInterval(timer)))}});
+document.getElementById('start').onclick=()=>{if(over||!running)init();else if(paused)togglePause();else init()};
+document.getElementById('newgame').onclick=init;document.getElementById('pausebtn').onclick=togglePause;
+init();showOverlay('¿Listo para jugar?','Completa líneas, suma puntos y supera tu récord.','JUGAR');
+})();
+</script>
+</body>
+</html>
